@@ -20,5 +20,7 @@ for image in image_list:
 	angle = Calculate_orientation_in_degree(Detected_ArUco_markers)				## finding orientation of aruco with respective to the menitoned scale in problem statement
 	img = mark_ArUco(img,Detected_ArUco_markers,angle)						## marking the parameters of aruco which are mentioned in the problem statement
 	result_image = "../scripts/Result_image"+ str(test_num)+".png"
-	cv2.imwrite(result_image,img)								## saving the result image
+	cv2.imshow(result_image,img)								## saving the result image
 	test_num = test_num +1
+cv2.waitKey(0)
+cv2.destroyAllWindows()

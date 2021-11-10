@@ -11,7 +11,7 @@ import time
 from SS_1933_aruco_library import *
 
 
-cam=cv2.VideoCapture("aruco.mp4")
+cam=cv2.VideoCapture("bonus.mp4")
 
 while True:
 	time.sleep(0.01)
@@ -20,7 +20,8 @@ while True:
 	angle = Calculate_orientation_in_degree(Detected_ArUco_markers)				## finding orientation of aruco with respective to the menitoned scale in problem statement
 	img = mark_ArUco(img,Detected_ArUco_markers,angle)						## marking the parameters of aruco which are mentioned in the problem statement
 	result_image = ".png"
-	cv2.imshow(result_image,img)					## saving the result image
+	cv2.imshow(result_image,img)
+	cv2.waitKey(0)					## saving the result image
 	if cv2.waitKey(1) & 0xFF == ord('q'):
 		break
 cv2.destroyAllWindows()

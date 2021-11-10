@@ -16,4 +16,5 @@
 		   args="record -O $(find task_1)/bag_files/$(arg rec_name) --duration=$(arg duration) --chunksize=10 /marker_info /gazebo/model_states_throttle" output="screen"/>
 
 	</group>
+    <node name="marker_detection" type="marker_detection.py" pkg="task_1" />
 </launch>

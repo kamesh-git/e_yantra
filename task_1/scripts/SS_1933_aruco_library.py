@@ -50,30 +50,15 @@ def Calculate_orientation_in_degree(Detected_ArUco_markers):
 		cX = int(M["m10"] / M["m00"])
 		cY = int(M["m01"] / M["m00"])
 		coor=((cX,cY),mid)
-		if coor[0][0]==coor[1][0] and coor[1][1]<=coor[0][1]:
-			ArUco_marker_angles[i]=90
-			continue
-		elif coor[0][0]==coor[1][0] and coor[1][1]>=coor[0][1]:
-			ArUco_marker_angles[i]=270
-			continue
-		m=(coor[0][1]-coor[1][1])/(coor[1][0]-coor[0][0])
-		ang=math.atan(m)
-		ang = round(math.degrees(ang))
-
-
-		if coor[1][0]<=coor[0][0] and coor[1][1]<=coor[0][1]:
-			ang+=180
-		elif coor[1][0]<=coor[0][0] and coor[1][1]>=coor[0][1]:
-			ang+=180
-		elif coor[1][0]>=coor[0][0] and coor[1][1]>coor[0][1]:
-			ang+=360
-		else:
-			ang=ang
-		
+		ang = math.degrees(math.atan2(coor[0][1]-coor[1][1],coor[1][0]-coor[0][0]))
+		ang=round(ang)
+		print("ang",ang)
+		ang=(ang+360)%360
 
 		ArUco_marker_angles[i]=ang
 
 
+	print("\n\nang",ArUco_marker_angles)
 	return ArUco_marker_angles	## returning the angles of the ArUco markers in degrees as a dictionary
 
 
@@ -103,7 +88,7 @@ def mark_ArUco(img,Detected_ArUco_markers,ArUco_marker_angles):
 		cv2.putText(img,i,(cX+10,cY),cv2.FONT_HERSHEY_COMPLEX,0.8,(0,0,255),thickness=2)
 		cv2.putText(img,str(ang),(cX-130,cY),cv2.FONT_HERSHEY_COMPLEX,0.8,(0,0,255),thickness=2)
 		cv2.line(img, (cX,cY),mid,(255,0,0) ,2)
-	img=cv2.resize(img,(1000,800))
+	# img=cv2.resize(img,(1000,800))
 	return img
 
 
