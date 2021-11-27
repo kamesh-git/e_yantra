@@ -109,6 +109,7 @@ def main():
 
     print(wps)
     md.wpPush(0,wps)
+    print("reached")
 
     md.wpPull(0)
     rospy.Subscriber("/mavros/state",State, stateMt.stateCb)

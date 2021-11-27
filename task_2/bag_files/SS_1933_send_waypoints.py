@@ -60,6 +60,16 @@ class Modes:
         # and print fail message on failure
         except rospy.ServiceException as e:
             print("error on pushing points:%s"%e)
+
+    def WpPull(self):
+        print("reach")
+        rospy.wait_for_service("mavros/mission/pull")
+        print("reached")
+        try:
+            pull_wp=rospy.ServiceProxy("mavros/mission/pull",WaypointPull)
+        except rospy.ServiceException as e:
+            print("Error in pulling waypoints:%s"%e)
+        return pull_wp()
    
 class stateMoniter:
     def __init__(self):
@@ -128,6 +138,7 @@ def main():
 
     print (wps)
     md.wpPush(0,wps)
+    print("called pull function:",md.WpPull())
 
 
     # Arming the drone
