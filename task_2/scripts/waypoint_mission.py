@@ -34,7 +34,7 @@ class Modes:
         rospy.wait_for_service('mavros/cmd/arming')  # Waiting untill the service starts 
         try:
             armService = rospy.ServiceProxy('mavros/cmd/arming', mavros_msgs.srv.CommandBool) # Creating a proxy service for the rosservice named /mavros/cmd/arming for arming the drone 
-            armService(True)
+            armService(value=True)
         except rospy.ServiceException as e:
             print ("Service arming call failed: %s"%e)
 

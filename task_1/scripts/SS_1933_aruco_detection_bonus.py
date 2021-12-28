@@ -11,7 +11,7 @@ import time
 from SS_1933_aruco_library import *
 
 
-cam=cv2.VideoCapture("bonus.mp4")
+cam=cv2.VideoCapture(0)
 
 while True:
 	time.sleep(0.01)
