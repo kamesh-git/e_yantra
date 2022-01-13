@@ -30,7 +30,7 @@ class pick_n_place:
 
 
 
-# arming or disarming the drone
+    # arming or disarming the drone
     def setArm(self,arm_bool):
         if arm_bool:
             res="ARM"
@@ -51,7 +51,7 @@ class pick_n_place:
 
 
 
-# setting any mode to the drone
+    # setting any mode to the drone
     def setMode(self,mode_val):
         while not (self.state.mode==mode_val):    
             rospy.wait_for_service('mavros/set_mode')
@@ -67,7 +67,7 @@ class pick_n_place:
 
 
 
-# navigating drone to required setpoint !!!!!!!!!!!!!
+    # navigating drone to required setpoint !!!!!!!!!!!!!
     def goto(self,setpoints,vel):
         self.reached=False
         self.setpoints=setpoints

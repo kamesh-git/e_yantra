@@ -69,7 +69,8 @@ def Calculate_orientation_in_degree(corners):
 class image_proc():
 
 	# Initialise everything
-	def __init__(self):
+	def __init__(self,aruco_obj):
+		self.aruco_obj=aruco_obj
 		rospy.init_node('marker_detection') #Initialise rosnode 
 		
 		# Making a publisher 
