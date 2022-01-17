@@ -76,7 +76,12 @@ class stateMoniter:
     def __init__(self):
         self.state = State()
         # Instantiate a setpoints message
+        # self.sp.header.stamp = rospy.get_rostime()
         self.sp = PositionTarget()
+        self.sp.header.frame_id = "1"
+        self.sp.coordinate_frame = 1
+        self.sp.type_mask = 0b0000101111000111
+
 
         
     def stateCb(self, msg):
@@ -102,7 +107,7 @@ def main():
     ofb_ctl = offboard_control()
     # Initialize publishers
     local_pos_pub = rospy.Publisher('mavros/setpoint_position/local', PoseStamped, queue_size=10)
-    local_vel_pub = rospy.Publisher('mavros/setpoint_velocity/cmd_vel', Twist, queue_size=10)
+    local_vel_pub = rospy.Publisher('mavros/setpoint_velocity/cmd_vel', TwistStamped, queue_size=10)
     # Specify the rate 
     rate = rospy.Rate(20.0)
 
@@ -120,10 +125,10 @@ def main():
     setpoints.append(pos)
 
     # Set your velocity here
-    vel = Twist()
-    vel.linear.x = 5.0
-    vel.linear.y = 5.0
-    vel.linear.z = 5.0
+    vel = TwistStamped()
+    vel.twist.linear.x = 0.1
+    vel.twist.linear.y = 0.1
+    vel.twist.linear.z = 0.1
     
     # Similarly add other containers 
     pos1 =PoseStamped()
@@ -176,12 +181,14 @@ def main():
     NOTE: To set the mode as OFFBOARD in px4, it needs atleast 100 setpoints at rate > 10 hz, so before changing the mode to OFFBOARD, send some dummy setpoints  
     '''
     print("arm")
+    print(stateMt.sp)
     for i in range(200):
         local_pos_pub.publish(pos)
         rate.sleep()
 
     # Arming the drone
     while not stateMt.state.armed:
+        print(stateMt.state)
         ofb_ctl.setArm()
         rate.sleep()
     print("Armed!!")
@@ -193,7 +200,6 @@ def main():
         print ("OFFBOARD mode not yet activated, current mode:",stateMt.state.mode)
 
     print ("OFFBOARD mode activated")
-    
     # Publish the setpoints 
     
     while not rospy.is_shutdown():
@@ -210,8 +216,10 @@ def main():
         if check == 7:
             local_pose.unregister()
             break
+        for i in range(100):
+            local_pos_pub.publish(pos)
+            rate.sleep()
         pos=setpoints[check]
-        local_pos_pub.publish(pos)
         local_vel_pub.publish(vel)
         rate.sleep()
 

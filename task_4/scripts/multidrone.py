@@ -19,7 +19,8 @@ from gazebo_ros_link_attacher.srv import *
 
 class aruco_library():
 
-    def __init__(self):
+    def __init__(self,drone_num):
+        self.drone_num=drone_num
         self.Detected_ArUco_markers={}
         self.ArUco_marker_angles={}
         self.img = np.empty([]) # This will contain your image frame from camera
@@ -42,6 +43,9 @@ class aruco_library():
 
         ## enter your code here ##
         img=img.copy()
+        cv2.imshow(self.drone_num,img)
+        if cv2.waitKey(1) & 0xFF == ord('r'):
+            cv2.destroyAllWindows()
         gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
         aruco_dict = aruco.Dictionary_get(aruco.DICT_5X5_250)
         parameters = aruco.DetectorParameters_create()
@@ -148,6 +152,7 @@ class pick_n_place():
             res="DISARM"
         while not (self.state.armed==arm_bool):
             print(self.drone_num,self.state.armed)
+            print(self.state)
             rospy.wait_for_service(self.drone_num+'/mavros/cmd/arming')
             try:
                 armService=rospy.ServiceProxy(self.drone_num+'/mavros/cmd/arming',CommandBool)
@@ -268,9 +273,11 @@ class pick_n_place():
 
 
 def drone_1():
-    drone1_aruco_obj=aruco_library()
+    drone1_aruco_obj=aruco_library('/edrone1')
     drone1_image_proc_obj=image_proc(drone1_aruco_obj,'/edrone1')
     drone1=pick_n_place(drone1_aruco_obj,drone1_image_proc_obj,'/edrone1')
+    rospy.Subscriber("/edrone1/mavros/state",State, drone1.statecb)
+
 
 
     pos =PoseStamped()
@@ -297,10 +304,13 @@ def drone_1():
 
 
 def drone_2():
-    drone2_aruco_obj=aruco_library()
+    drone2_aruco_obj=aruco_library('/edrone2')
     drone2_image_proc_obj=image_proc(drone2_aruco_obj,'/edrone2')
     drone2=pick_n_place(drone2_aruco_obj,drone2_image_proc_obj,'/edrone2')
+    rospy.Subscriber("/edrone2/mavros/state",State, drone2.statecb)
+    
     pos =PoseStamped()
+
 
     pos.pose.position.x = 0
     pos.pose.position.y = 0
@@ -322,7 +332,8 @@ def drone_2():
 
 
 
-rospy.init_node('pick_n_place',anonymous=True)
+rospy.init_node('multi_drone',anonymous=True)
+# drone_1()
 t1=Thread(target=drone_1)
 t2=Thread(target=drone_2)
 
