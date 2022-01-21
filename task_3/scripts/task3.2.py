@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-from pickle import TRUE
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
 import cv2.aruco as aruco
@@ -42,6 +41,10 @@ class aruco_library():
 
         ## enter your code here ##
         img=img.copy()
+        print("img")
+        cv2.imshow("img",img)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            cv2.destroyAllWindows()
         gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
         aruco_dict = aruco.Dictionary_get(aruco.DICT_5X5_250)
         parameters = aruco.DetectorParameters_create()
@@ -209,7 +212,7 @@ class pick_n_place():
        self.box_pos=PoseStamped()
        self.box_pos.pose.position.x,self.box_pos.pose.position.y,self.box_pos.pose.position.z=self.xn+1,self.yn+1,self.zn     #adding 1 because of inertia
        print(self.xn,self.yn,self.zn)
-       for i in range(100):
+       for i in range(200):
            self.local_vel_pub.publish(self.vel)
            self.local_pos_pub.publish(self.box_pos)
            self.rate.sleep()
@@ -300,18 +303,15 @@ def main():
     pos1.pose.position.x = 0
     pos1.pose.position.y = 0
     pos1.pose.position.z = 3
-    setpoints.append(pos1)
 
     pos2.pose.position.x = 9
     pos2.pose.position.y = 0
     pos2.pose.position.z = 3
-    setpoints.append(pos2)
 
 
     pos3.pose.position.x = 9
     pos3.pose.position.y = 0
     pos3.pose.position.z = 0
-    setpoints.append(pos3)
     
     setpoints.append(pos)
     print("publishing dummy points....")

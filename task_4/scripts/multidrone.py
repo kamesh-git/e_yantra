@@ -43,9 +43,6 @@ class aruco_library():
 
         ## enter your code here ##
         img=img.copy()
-        cv2.imshow(self.drone_num,img)
-        if cv2.waitKey(1) & 0xFF == ord('r'):
-            cv2.destroyAllWindows()
         gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
         aruco_dict = aruco.Dictionary_get(aruco.DICT_5X5_250)
         parameters = aruco.DetectorParameters_create()
@@ -151,15 +148,13 @@ class pick_n_place():
         else:
             res="DISARM"
         while not (self.state.armed==arm_bool):
-            print(self.drone_num,self.state.armed)
-            print(self.state)
             rospy.wait_for_service(self.drone_num+'/mavros/cmd/arming')
             try:
                 armService=rospy.ServiceProxy(self.drone_num+'/mavros/cmd/arming',CommandBool)
                 armService(arm_bool)
             except rospy.ServiceException as e:
                 print("failed to arm:%s"%e)
-            print(res+"ING...",self.state.armed)
+            print(res+"ING...",self.drone_num)
             self.rate.sleep()
         print(res+"ED!!!")
 
@@ -271,80 +266,129 @@ class pick_n_place():
             self.activate_gripper(att_bool)     
 # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-
-def drone_1():
-    drone1_aruco_obj=aruco_library('/edrone1')
-    drone1_image_proc_obj=image_proc(drone1_aruco_obj,'/edrone1')
-    drone1=pick_n_place(drone1_aruco_obj,drone1_image_proc_obj,'/edrone1')
-    rospy.Subscriber("/edrone1/mavros/state",State, drone1.statecb)
-
-
-
-    pos =PoseStamped()
-
-    pos.pose.position.x = 0
-    pos.pose.position.y = 0
-    pos.pose.position.z = 0
-
-    # Set your velocity here
-    vel = Twist()
-    vel.linear.y = 1
-    vel.linear.z = 1
-    vel.linear.x = 1
-
-    print("publishing dummy points....")
-    for i in range(200):
-        print(i)
-        drone1.local_pos_pub.publish(pos)
-        drone1.rate.sleep()
-    drone1.setArm(True)
-    drone1.setMode("OFFBOARD")
+class drones():
+    def drone_1(self):
+        self.drone1_aruco_obj=aruco_library('/edrone0')
+        self.drone1_image_proc_obj=image_proc(self.drone1_aruco_obj,'/edrone0')
+        self.drone1=pick_n_place(self.drone1_aruco_obj,self.drone1_image_proc_obj,'/edrone0')
+        rospy.Subscriber("/edrone0/mavros/state",State, self.drone1.statecb)
 
 
 
+        pos =PoseStamped()
 
-def drone_2():
-    drone2_aruco_obj=aruco_library('/edrone2')
-    drone2_image_proc_obj=image_proc(drone2_aruco_obj,'/edrone2')
-    drone2=pick_n_place(drone2_aruco_obj,drone2_image_proc_obj,'/edrone2')
-    rospy.Subscriber("/edrone2/mavros/state",State, drone2.statecb)
-    
-    pos =PoseStamped()
+        pos.pose.position.x = 8.9
+        pos.pose.position.y = 16
+        pos.pose.position.z = 0
 
+        # Set your velocity here
+        vel = Twist()
+        vel.linear.y = 5
+        vel.linear.z = 5
+        vel.linear.x = 5
+        pos1=PoseStamped()
+        pos2=PoseStamped()
+        pos3=PoseStamped()
+        pos1.pose.position.x = 8.9
+        pos1.pose.position.y = 16
+        pos1.pose.position.z = 0
 
-    pos.pose.position.x = 0
-    pos.pose.position.y = 0
-    pos.pose.position.z = 0
-
-    # Set your velocity here
-    vel = Twist()
-    vel.linear.y = 1
-    vel.linear.z = 1
-    vel.linear.x = 1
-
-    print("publishing dummy points....")
-    for i in range(200):
-        print(i)
-        drone2.local_pos_pub.publish(pos)
-        drone2.rate.sleep()
-    drone2.setArm(True)
-    drone2.setMode("OFFBOARD")
+        pos2.pose.position.x = 9
+        pos2.pose.position.y = 16
+        pos2.pose.position.z = 3
 
 
+        pos3.pose.position.x = 9
+        pos3.pose.position.y = 16
+        pos3.pose.position.z = 3
 
+        print("publishing dummy points....")
+        for i in range(200):
+            self.drone1.local_pos_pub.publish(pos)
+            self.drone1.rate.sleep()
+        self.drone1.setArm(True)
+        self.drone1.setMode("OFFBOARD")
+        while True:
+             pos1.pose.position.x,pos1.pose.position.y,pos1.pose.position.z = tuple([float(i) for i in input("enter coor").split()])
+             if pos1.pose.position.z ==-1 :
+                 break
+             self.drone1.goto(pos1,vel)
+        self.drone1.activate_gripper(True)
+        self.drone1.goto(pos2,vel)
+        self.drone1.setMode("AUTO.LAND")
+        # self.drone1.goto(pos3,vel)
+        
+
+
+
+    def drone_2(self):
+        self.drone2_aruco_obj=aruco_library('/edrone1')
+        self.drone2_image_proc_obj=image_proc(self.drone2_aruco_obj,'/edrone1')
+        self.drone2=pick_n_place(self.drone2_aruco_obj,self.drone2_image_proc_obj,'/edrone1')
+        rospy.Subscriber("/edrone1/mavros/state",State, self.drone2.statecb)
+        
+        pos =PoseStamped()
+
+
+        pos.pose.position.x = 0
+        pos.pose.position.y = 0
+        pos.pose.position.z = 0
+
+        # Set your velocity here
+        vel = Twist()
+        vel.linear.y = 5
+        vel.linear.z = 5
+        vel.linear.x = 5
+        pos1=PoseStamped()
+        pos2=PoseStamped()
+        pos1.pose.position.x = 0
+        pos1.pose.position.y = 0
+        pos1.pose.position.z = 3
+
+        pos2.pose.position.x = 9
+        pos2.pose.position.y = 0
+        pos2.pose.position.z = 3
+
+        print("publishing dummy points....")
+        for i in range(200):
+            print(i)
+            self.drone2.local_pos_pub.publish(pos)
+            self.drone2.rate.sleep()
+        self.drone2.setArm(True)
+        self.drone2.setMode("OFFBOARD")
+        self.drone2.goto(pos1,vel)
+        self.drone2.goto(pos2,vel)
+
+
+    def camera_feed(self):
+        while True:
+            cv2.imshow("drone 1",self.drone1_image_proc_obj.img)
+            # cv2.imshow("drone 2",self.drone2_image_proc_obj.img)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                cv2.destroyAllWindows()
+                break
+
+
+
+
+print("new file")
 rospy.init_node('multi_drone',anonymous=True)
-# drone_1()
-t1=Thread(target=drone_1)
-t2=Thread(target=drone_2)
+drones_obj=drones()
+# drone_2()
+t1=Thread(target=drones_obj.drone_1)
+t2=Thread(target=drones_obj.drone_2)
+t3=Thread(target=drones_obj.camera_feed)
 
 # starting the threads
 t1.start()
-t2.start()
+# t2.start()
+time.sleep(1)
+t3.start()
 
 # waiting for the threads to complete
 t1.join()
-t2.join()
+# t2.join()
+t3.join()
 
 
 print("completed....")
-

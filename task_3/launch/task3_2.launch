@@ -13,7 +13,7 @@
 
 	<include file="$(find px4)/launch/posix_sitl.launch">
 		<arg name="world" value="$(find task_3)/worlds/task3_2.world"/>
-		<arg name="vehicle" value="iris"/>
+		<arg name="vehicle" value="edrone"/>
 		<arg name="sdf" value="$(find task_3)/models/eDrone/eDrone.sdf"/>
 		<arg name="z" value="1"/>
 	</include>
