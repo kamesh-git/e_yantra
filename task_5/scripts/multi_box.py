@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-from pickletools import uint8
 from threading import Thread
 import rospy
 from sensor_msgs.msg import Image
@@ -50,8 +49,8 @@ class aruco_library():
         parameters = aruco.DetectorParameters_create()
         corner, ids, _ = aruco.detectMarkers(gray, aruco_dict, parameters = parameters)
         try:	
-            for i in range(len(ids)):
-                self.Detected_ArUco_markers[str(*ids[i])]=corner[i].astype('i')
+            i=0
+            self.Detected_ArUco_markers[str(*ids[i])]=corner[i].astype('i')
             self.Calculate_orientation_in_degree(img,self.Detected_ArUco_markers)
         except:
             self.Detected_ArUco_markers={}
@@ -187,7 +186,7 @@ class pick_n_place():
 
 
     # navigating drone to required setpoint !!!!!!!!!!!!!
-    def goto(self,setpoints,vel,x=0,grip_activ=False,tol=0.2):
+    def goto(self,setpoints,vel,x=0,grip_activ=False,xy_tol=0.2,z_tol=0.2):
         self.setpoints=PoseStamped()
         self.vel=vel
         self.setpoints.pose.position.y=setpoints.pose.position.y
@@ -199,8 +198,8 @@ class pick_n_place():
 
 
 
-        
-        while not ((self.xn<self.x+tol and self.xn>self.x-tol) and (self.yn<self.y+tol and self.yn>self.y-tol) and (self.zn<self.z+0.5 and self.zn>self.z-0.5)):
+        self.time_check=time.time()
+        while not ((self.xn<self.x+xy_tol and self.xn>self.x-xy_tol) and (self.yn<self.y+xy_tol and self.yn>self.y-xy_tol) and (self.zn<self.z+z_tol and self.zn>self.z-z_tol)):
             self.local_pos_pub.publish(self.setpoints)
             self.local_vel_pub.publish(vel)
             self.rate.sleep()
@@ -208,6 +207,7 @@ class pick_n_place():
                 self.box_grip()
                 return
         if self.x < setpoints.pose.position.x:
+            setpoints.pose.position.z=3
             x+=4
             self.goto(setpoints,vel,x,True)
         print("reached the setpoint")
@@ -234,7 +234,7 @@ class pick_n_place():
        time.sleep(4)
        self.activate_gripper(False)
        self.setMode('OFFBOARD')
-       self.goto(self.truck_pos,self.vel,self.truck_pos.pose.position.x,tol=0.5)
+       self.goto(self.truck_pos,self.vel,self.truck_pos.pose.position.x,xy_tol=0.2,z_tol=0.5)
        self.in_range=False
 
 
@@ -249,15 +249,15 @@ class pick_n_place():
            self.box_pos.pose.position.z=self.z
            print(self.x_diff,self.y_diff,list(self.aruco_obj.Detected_ArUco_markers.keys()))
         #    time.sleep(0.5)
-           if (self.x_diff>=-0.01 and self.x_diff<=0.03) and (self.y_diff>=-0.01 and self.y_diff<=0.03) and len(list(self.aruco_obj.Detected_ArUco_markers.keys())):
+           if (self.x_diff>=-0.04 and self.x_diff<=0.03) and (self.y_diff>=-0.015 and self.y_diff<=0.03) and len(list(self.aruco_obj.Detected_ArUco_markers.keys())):
                break
-           else:
+           elif (self.y_diff>=-0.5 and self.y_diff<=0.5):
             self.local_vel_pub.publish(self.vel)
             self.local_pos_pub.publish(self.box_pos)
             self.rate.sleep()
             print(".....",end="")
        print(self.xn,self.yn)
-       self.truck_pos=ret_truck_pos(list(self.aruco_obj.Detected_ArUco_markers.keys())[0])
+       self.truck_pos=ret_truck_pos(list(self.aruco_obj.Detected_ArUco_markers.keys())[0],self.drone_num)
        self.autoLand()
        self.gripper_check=rospy.Subscriber(self.drone_num+"/gripper_check",String,self.gripper_check_cb)
        print("landed on box")
@@ -316,18 +316,19 @@ class drones():
         rospy.Subscriber("/edrone0/mavros/state",State, self.drone1.statecb)
         print("publishing dummy points....")
         for i in range(200):
+            print(i)
             self.drone1.local_pos_pub.publish(pos)
             self.drone1.local_vel_pub.publish(vel)
             self.drone1.rate.sleep()
         self.drone1.setArm(True)
         self.drone1.setMode("OFFBOARD")
-        self.drone1.goto(pos,vel,tol=0.5)
+        self.drone1.goto(pos,vel,z_tol=0.5)
         for i in row_list_num:
             y=row_list_num.pop(0)*4-4
             pos1.pose.position.x = 100
             pos1.pose.position.y = y
             pos1.pose.position.z = 3
-            self.drone1.goto(pos1,vel,tol=0.3)
+            self.drone1.goto(pos1,vel,xy_tol=0.1)
 
         self.drone1.goto(pos,vel)        
         self.drone1.autoLand()
@@ -344,7 +345,7 @@ class drones():
 
         pos.pose.position.x = 0
         pos.pose.position.y = 0
-        pos.pose.position.z = 3
+        pos.pose.position.z = 5
 
         # Set your velocity here
         vel = Twist()
@@ -363,13 +364,14 @@ class drones():
             self.drone2.rate.sleep()
         self.drone2.setArm(True)
         self.drone2.setMode("OFFBOARD")
-        self.drone2.goto(pos,vel,tol=0.5)
+        print(pos)
+        self.drone2.goto(pos,vel,z_tol=0.5)
         for i in row_list_num:
-            y=row_list_num.pop(0)*4-4
+            y=-((16-row_list_num.pop(0))*4)
             pos1.pose.position.x = 100
             pos1.pose.position.y = y
-            pos1.pose.position.z = 3
-            self.drone2.goto(pos1,vel,tol=0.3)
+            pos1.pose.position.z = 4
+            self.drone2.goto(pos1,vel,xy_tol=0.2)
         self.drone2.goto(pos,vel)        
         self.drone2.autoLand()
         self.drone2.setArm(False)
@@ -378,7 +380,7 @@ class drones():
     def camera_feed(self):
         while True:
             cv2.imshow("drone 1",self.drone1_image_proc_obj.img)
-            # cv2.imshow("drone 2",self.drone2_image_proc_obj.img)
+            cv2.imshow("drone 2",self.drone2_image_proc_obj.img)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 cv2.destroyAllWindows()
                 break
@@ -388,18 +390,31 @@ def row_list(msg):
     print(row_list_num)
 
 
-def ret_truck_pos(box_id):
+def ret_truck_pos(box_id,drone_num):
     truck_pos=PoseStamped()
-    if box_id=='1':
-        x_cor,y_cor=red_truck_pos.pop(0)
-        truck_pos.pose.position.x = 60.05-x_cor
-        truck_pos.pose.position.y = 3.75+y_cor
-        truck_pos.pose.position.z = 6
-    if box_id=='2':
-        x_cor,y_cor=blue_truck_pos.pop(0)        
-        truck_pos.pose.position.x = 17.4-x_cor
-        truck_pos.pose.position.y = -8.4+y_cor
-        truck_pos.pose.position.z = 6
+    if drone_num=='/edrone0':
+        if box_id=='1':
+            x_cor,y_cor=red_truck_pos.pop(0)
+            truck_pos.pose.position.x = 60.05-x_cor
+            truck_pos.pose.position.y = 63.75+y_cor
+            truck_pos.pose.position.z = 6
+        if box_id=='2':
+            x_cor,y_cor=blue_truck_pos.pop(0)        
+            truck_pos.pose.position.x = 17.4-x_cor
+            truck_pos.pose.position.y = -8.4+y_cor
+            truck_pos.pose.position.z = 6
+    if drone_num=='/edrone1':
+        if box_id=='1':
+            x_cor,y_cor=red_truck_pos.pop(0)
+            truck_pos.pose.position.x = 60.05-x_cor
+            truck_pos.pose.position.y = 3.75+y_cor
+            truck_pos.pose.position.z = 6
+        if box_id=='2':
+            x_cor,y_cor=blue_truck_pos.pop(0)        
+            truck_pos.pose.position.x = 17.4-x_cor
+            truck_pos.pose.position.y = -68.4+y_cor
+            truck_pos.pose.position.z = 6
+
     print(truck_pos)
     return truck_pos
 
@@ -412,36 +427,36 @@ print("new file")
 row_list_num=[]
 rospy.init_node('multi_box',anonymous=True)
 drones_obj=drones()
-rospy.Subscriber("/spawn_info",UInt8, row_list)
 
 truck_pos=[]
 for x in range(4):
     for y in range(3):
         for k in range(2):
-            truck_pos.append((x*1.23,y*0.85))
+            truck_pos.append((x*0.85,y*1.23))
 blue_truck_pos=truck_pos.copy()
 red_truck_pos=truck_pos.copy()
 
 
 
 # initializing the thread
-while True:
-    if len(row_list_num):  
-        t1=Thread(target=drones_obj.drone_1)
-        # t2=Thread(target=drones_obj.drone_2)
-        t3=Thread(target=drones_obj.camera_feed)
+# while True:
+#     if len(row_list_num):  
+t1=Thread(target=drones_obj.drone_1)
+t2=Thread(target=drones_obj.drone_2)
+t3=Thread(target=drones_obj.camera_feed)
 
-        # starting the threads
-        t1.start()
-        # t2.start()
-        time.sleep(1)
-        t3.start()
+# starting the threads
+t1.start()
+time.sleep(1)
+t2.start()
+rospy.Subscriber("/spawn_info",UInt8, row_list)
+time.sleep(10)
+t3.start()
 
-        # waiting for the threads to complete
-        t1.join()
-        # t2.join()
-        t3.join()
-        break
+# waiting for the threads to complete
+t1.join()
+t2.join()
+t3.join()
 
 
 print("completed....")
