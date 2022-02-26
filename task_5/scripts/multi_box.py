@@ -171,7 +171,7 @@ class pick_n_place():
 
 
 
-    def autoLand(self,tol=0.1):
+    def autoLand(self,tol=1):
         while not (self.state.mode=='AUTO.LAND' and self.zn<tol):    
             rospy.wait_for_service(self.drone_num+'/mavros/set_mode')
             try:
@@ -227,8 +227,12 @@ class pick_n_place():
        self.activate_gripper(True)
        time.sleep(2)
        self.setMode('OFFBOARD')
-       self.goto(self.setpoints,self.vel,self.setpoints.pose.position.x)
-       self.goto(self.truck_pos,self.vel,self.truck_pos.pose.position.x+0.85)
+       self.goto(self.setpoints,self.vel,self.setpoints.pose.position.x,z_tol=0.5)
+       self.goto(self.truck_pos,self.vel,self.truck_pos.pose.position.x+0.85,z_tol=0.5)
+       self.goto(self.truck_pos,self.vel,self.truck_pos.pose.position.x)
+       self.truck_pos.pose.position.z=5
+       self.goto(self.truck_pos,self.vel,self.truck_pos.pose.position.x)
+       self.truck_pos.pose.position.z=4
        self.goto(self.truck_pos,self.vel,self.truck_pos.pose.position.x)
        self.autoLand(3)
        time.sleep(4)
@@ -241,6 +245,7 @@ class pick_n_place():
     def correction(self):
        self.box_pos=PoseStamped()
        print("in the loop")
+       self.time_check=time.time()
        while True:
            self.x_diff=(self.aruco_obj.cX-200)*0.01546153846153846      #g/p ratio:0.01546153846153846,0.015228426395939089
            self.y_diff=(200-self.aruco_obj.cY)*0.01546153846153846+0.4
@@ -249,15 +254,49 @@ class pick_n_place():
            self.box_pos.pose.position.z=self.z
            print(self.x_diff,self.y_diff,list(self.aruco_obj.Detected_ArUco_markers.keys()))
         #    time.sleep(0.5)
-           if (self.x_diff>=-0.04 and self.x_diff<=0.03) and (self.y_diff>=-0.015 and self.y_diff<=0.03) and len(list(self.aruco_obj.Detected_ArUco_markers.keys())):
-               break
-           elif (self.y_diff>=-0.5 and self.y_diff<=0.5):
-            self.local_vel_pub.publish(self.vel)
-            self.local_pos_pub.publish(self.box_pos)
-            self.rate.sleep()
-            print(".....",end="")
+        #    if (self.x_diff>=-0.04 and self.x_diff<=0.03) and (self.y_diff>=-0.015 and self.y_diff<=0.03) and len(list(self.aruco_obj.Detected_ArUco_markers.keys())):
+        #        break
+        #    elif (self.y_diff>=-0.5 and self.y_diff<=0.5):
+        #     self.local_vel_pub.publish(self.vel)
+        #     self.local_pos_pub.publish(self.box_pos)
+        #     self.rate.sleep()
+        #     print(".....",end="")
+           if (self.x_diff>=-0.1 and self.x_diff<=0.1) and (self.y_diff>=-0.1 and self.y_diff<=0.1):
+                if time.time() > self.time_check + 5:
+                    print('broke by time')
+                    if len(list(self.aruco_obj.Detected_ArUco_markers.keys())):
+                       self.truck_pos=ret_truck_pos(list(self.aruco_obj.Detected_ArUco_markers.keys())[0],self.drone_num)
+                       break
+                else:
+                    print(time.time(),self.time_check)
+                    self.local_vel_pub.publish(self.vel)
+                    self.local_pos_pub.publish(self.box_pos)
+                    self.rate.sleep()
+                    print(".....",end="")
+           elif (self.x_diff>=-0.04 and self.x_diff<=0.03) and (self.y_diff>=-0.015 and self.y_diff<=0.03) and len(list(self.aruco_obj.Detected_ArUco_markers.keys())):
+                print("broke by correction")
+                if len(list(self.aruco_obj.Detected_ArUco_markers.keys())):
+                       self.truck_pos=ret_truck_pos(list(self.aruco_obj.Detected_ArUco_markers.keys())[0],self.drone_num)
+                       break
+           elif (self.y_diff>=-1 and self.y_diff<=1):
+               self.time_check=time.time()
+               self.local_vel_pub.publish(self.vel)
+               self.local_pos_pub.publish(self.box_pos)
+               self.rate.sleep()
+               print(".....",end="")
+
+
+
+
+
+
+
+
+
+
+
+
        print(self.xn,self.yn)
-       self.truck_pos=ret_truck_pos(list(self.aruco_obj.Detected_ArUco_markers.keys())[0],self.drone_num)
        self.autoLand()
        self.gripper_check=rospy.Subscriber(self.drone_num+"/gripper_check",String,self.gripper_check_cb)
        print("landed on box")
@@ -280,9 +319,9 @@ class pick_n_place():
             
 
     def activate_gripper(self,att_bool):
-        rospy.wait_for_service(self.drone_num+'/activate_gripper')
         while not self.in_range:
             pass
+        rospy.wait_for_service(self.drone_num+'/activate_gripper')
         try:
             set_gripper=rospy.ServiceProxy(self.drone_num+'/activate_gripper',Gripper)
             resp=set_gripper(att_bool)
@@ -315,7 +354,7 @@ class drones():
         self.drone1=pick_n_place(self.drone1_aruco_obj,self.drone1_image_proc_obj,'/edrone0')
         rospy.Subscriber("/edrone0/mavros/state",State, self.drone1.statecb)
         print("publishing dummy points....")
-        for i in range(200):
+        for i in range(160):
             print(i)
             self.drone1.local_pos_pub.publish(pos)
             self.drone1.local_vel_pub.publish(vel)
@@ -327,7 +366,7 @@ class drones():
             y=row_list_num.pop(0)*4-4
             pos1.pose.position.x = 100
             pos1.pose.position.y = y
-            pos1.pose.position.z = 3
+            pos1.pose.position.z = 4
             self.drone1.goto(pos1,vel,xy_tol=0.1)
 
         self.drone1.goto(pos,vel)        
@@ -359,19 +398,18 @@ class drones():
         self.drone2=pick_n_place(self.drone2_aruco_obj,self.drone2_image_proc_obj,'/edrone1')
         rospy.Subscriber("/edrone1/mavros/state",State, self.drone2.statecb)
         print("publishing dummy points....")
-        for i in range(200):
+        for i in range(160):
             self.drone2.local_pos_pub.publish(pos)
             self.drone2.rate.sleep()
         self.drone2.setArm(True)
         self.drone2.setMode("OFFBOARD")
-        print(pos)
-        self.drone2.goto(pos,vel,z_tol=0.5)
+        self.drone2.goto(pos,vel,xy_tol=0.3,z_tol=0.5)
         for i in row_list_num:
             y=-((16-row_list_num.pop(0))*4)
             pos1.pose.position.x = 100
             pos1.pose.position.y = y
-            pos1.pose.position.z = 4
-            self.drone2.goto(pos1,vel,xy_tol=0.2)
+            pos1.pose.position.z = 3
+            self.drone2.goto(pos1,vel,xy_tol=0.2,z_tol=0.5)
         self.drone2.goto(pos,vel)        
         self.drone2.autoLand()
         self.drone2.setArm(False)
@@ -391,6 +429,7 @@ def row_list(msg):
 
 
 def ret_truck_pos(box_id,drone_num):
+    global previous_truck_pos
     truck_pos=PoseStamped()
     if drone_num=='/edrone0':
         if box_id=='1':
@@ -414,8 +453,11 @@ def ret_truck_pos(box_id,drone_num):
             truck_pos.pose.position.x = 17.4-x_cor
             truck_pos.pose.position.y = -68.4+y_cor
             truck_pos.pose.position.z = 6
+        if (previous_truck_pos.pose.position.x==truck_pos.pose.position.x):
+            if (previous_truck_pos.pose.position.y==truck_pos.pose.position.y+60 or previous_truck_pos.pose.position.y==truck_pos.pose.position.y-60):
+                truck_pos=ret_truck_pos(box_id,drone_num)
+        previous_truck_pos=truck_pos
 
-    print(truck_pos)
     return truck_pos
 
 
@@ -424,6 +466,7 @@ def ret_truck_pos(box_id,drone_num):
 
 
 print("new file")
+previous_truck_pos=PoseStamped()
 row_list_num=[]
 rospy.init_node('multi_box',anonymous=True)
 drones_obj=drones()

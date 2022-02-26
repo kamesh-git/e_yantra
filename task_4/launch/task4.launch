@@ -15,7 +15,7 @@
 
 	<group if="$(arg record)">
 		<node name="rosbag_record_multidrone" pkg="rosbag" type="record"
-		   args="record -O $(find task_4)/bag_files/$(arg rec_name) --duration=$(arg duration) --chunksize=10 /mavros/setpoint_position/local /mavros/local_position/pose /gazebo/model_states_throttle " output="screen"/>
+		   args="record -O $(find task_4)/bag_files/$(arg rec_name) --duration=$(arg duration) --chunksize=10 /edrone0/mavros/setpoint_position/local /edrone0/mavros/local_position/pose /edrone1/mavros/setpoint_position/local /edrone1/mavros/local_position/pose /gazebo/model_states_throttle " output="screen"/>
 
 	</group>
 
