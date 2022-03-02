@@ -51,6 +51,9 @@ class aruco_library():
         try:	
             i=0
             self.Detected_ArUco_markers[str(*ids[i])]=corner[i].astype('i')
+            self.dist_aruco=((corner[0][0][1][0]-corner[0][0][3][0])**2 + (corner[0][0][1][1]-corner[0][0][3][1])**2)**0.5
+            self.pix2cm_ratio=0.2856191880599769/self.dist_aruco
+
             self.Calculate_orientation_in_degree(img,self.Detected_ArUco_markers)
         except:
             self.Detected_ArUco_markers={}
@@ -209,7 +212,7 @@ class pick_n_place():
         if self.x < setpoints.pose.position.x:
             setpoints.pose.position.z=3
             x+=4
-            self.goto(setpoints,vel,x,True)
+            self.goto(setpoints,vel,x,True,xy_tol=0.4,z_tol=0.4)
         print("reached the setpoint")
 
 
@@ -228,17 +231,17 @@ class pick_n_place():
        time.sleep(2)
        self.setMode('OFFBOARD')
        self.goto(self.setpoints,self.vel,self.setpoints.pose.position.x,z_tol=0.5)
-       self.goto(self.truck_pos,self.vel,self.truck_pos.pose.position.x+0.85,z_tol=0.5)
+       self.goto(self.truck_pos,self.vel,self.truck_pos.pose.position.x+1,z_tol=0.5)
        self.goto(self.truck_pos,self.vel,self.truck_pos.pose.position.x)
-       self.truck_pos.pose.position.z=5
-       self.goto(self.truck_pos,self.vel,self.truck_pos.pose.position.x)
-       self.truck_pos.pose.position.z=4
-       self.goto(self.truck_pos,self.vel,self.truck_pos.pose.position.x)
-       self.autoLand(3)
-       time.sleep(4)
+    #    self.truck_pos.pose.position.z=5
+    #    self.goto(self.truck_pos,self.vel,self.truck_pos.pose.position.x)
+    #    self.truck_pos.pose.position.z=4
+    #    self.goto(self.truck_pos,self.vel,self.truck_pos.pose.position.x)
+       self.autoLand(2)
+       time.sleep(1.5)
        self.activate_gripper(False)
        self.setMode('OFFBOARD')
-       self.goto(self.truck_pos,self.vel,self.truck_pos.pose.position.x,xy_tol=0.2,z_tol=0.5)
+       self.goto(self.truck_pos,self.vel,self.truck_pos.pose.position.x,xy_tol=0.5,z_tol=0.5)
        self.in_range=False
 
 
@@ -247,8 +250,9 @@ class pick_n_place():
        print("in the loop")
        self.time_check=time.time()
        while True:
-           self.x_diff=(self.aruco_obj.cX-200)*0.01546153846153846      #g/p ratio:0.01546153846153846,0.015228426395939089
-           self.y_diff=(200-self.aruco_obj.cY)*0.01546153846153846+0.4
+           print('ratio:',self.aruco_obj.pix2cm_ratio)
+           self.x_diff=(self.aruco_obj.cX-200)*self.aruco_obj.pix2cm_ratio     #g/p ratio:0.01546153846153846,0.015228426395939089
+           self.y_diff=(200-self.aruco_obj.cY)*self.aruco_obj.pix2cm_ratio+0.4
            self.box_pos.pose.position.x=self.xn+self.x_diff
            self.box_pos.pose.position.y=self.yn+self.y_diff
            self.box_pos.pose.position.z=self.z
@@ -262,7 +266,7 @@ class pick_n_place():
         #     self.rate.sleep()
         #     print(".....",end="")
            if (self.x_diff>=-0.1 and self.x_diff<=0.1) and (self.y_diff>=-0.1 and self.y_diff<=0.1):
-                if time.time() > self.time_check + 5:
+                if time.time() > self.time_check + 4:
                     print('broke by time')
                     if len(list(self.aruco_obj.Detected_ArUco_markers.keys())):
                        self.truck_pos=ret_truck_pos(list(self.aruco_obj.Detected_ArUco_markers.keys())[0],self.drone_num)
@@ -308,7 +312,7 @@ class pick_n_place():
             self.gripper_check.unregister()
             self.in_range=True
             self.loop_num=0
-        if self.loop_num==50:
+        if self.loop_num==20:
             self.gripper_check.unregister()
             self.setMode('OFFBOARD')
             self.correction()
@@ -436,12 +440,12 @@ def ret_truck_pos(box_id,drone_num):
             x_cor,y_cor=red_truck_pos.pop(0)
             truck_pos.pose.position.x = 60.05-x_cor
             truck_pos.pose.position.y = 63.75+y_cor
-            truck_pos.pose.position.z = 6
+            truck_pos.pose.position.z = 4
         if box_id=='2':
             x_cor,y_cor=blue_truck_pos.pop(0)        
             truck_pos.pose.position.x = 17.4-x_cor
             truck_pos.pose.position.y = -8.4+y_cor
-            truck_pos.pose.position.z = 6
+            truck_pos.pose.position.z = 4
     if drone_num=='/edrone1':
         if box_id=='1':
             x_cor,y_cor=red_truck_pos.pop(0)
@@ -453,10 +457,21 @@ def ret_truck_pos(box_id,drone_num):
             truck_pos.pose.position.x = 17.4-x_cor
             truck_pos.pose.position.y = -68.4+y_cor
             truck_pos.pose.position.z = 6
-        if (previous_truck_pos.pose.position.x==truck_pos.pose.position.x):
-            if (previous_truck_pos.pose.position.y==truck_pos.pose.position.y+60 or previous_truck_pos.pose.position.y==truck_pos.pose.position.y-60):
+    if previous_truck_pos[1] != drone_num:
+        if (previous_truck_pos[0].pose.position.x==truck_pos.pose.position.x):
+            if (previous_truck_pos[0].pose.position.y==truck_pos.pose.position.y+60 or previous_truck_pos[0].pose.position.y==truck_pos.pose.position.y-60):
+                red_truck_pos.append((x_cor,y_cor)) if box_id == '1' else blue_truck_pos.append((x_cor,y_cor))
+                for i in range(2):
+                    if box_id == '1':
+                        red_truck_pos.append(red_truck_pos.pop(0))
+                        print(red_truck_pos)
+                    else:
+                        blue_truck_pos.append(blue_truck_pos.pop(0))
+                        print(blue_truck_pos)
                 truck_pos=ret_truck_pos(box_id,drone_num)
-        previous_truck_pos=truck_pos
+                print(truck_pos)
+
+    previous_truck_pos=[truck_pos,drone_num,box_id]
 
     return truck_pos
 
@@ -466,7 +481,7 @@ def ret_truck_pos(box_id,drone_num):
 
 
 print("new file")
-previous_truck_pos=PoseStamped()
+previous_truck_pos=[PoseStamped(),'','']
 row_list_num=[]
 rospy.init_node('multi_box',anonymous=True)
 drones_obj=drones()

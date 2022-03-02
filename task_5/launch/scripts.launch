@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<launch>
+	<node name="multi_box" type="multi_box.py" pkg="task_5"/>
+    <group ns="edrone0">
+        <node pkg="rqt_image_view" type="rqt_image_view" name="image_view_debug" args="/edrone0/camera/image_raw"/>
+    </group>
+    <group ns="edrone1">
+        <node pkg="rqt_image_view" type="rqt_image_view" name="image_view_debug" args="/edrone1/camera/image_raw"/>
+    </group>
+    <!-- <node type="rqt_image_view.py" pkg="rqt_image_view"/> -->
+    <!-- <node name="rqt_image_view" type="rqt_image_view.py" pkg="rqt_image_view"/> -->
+
+</launch>
