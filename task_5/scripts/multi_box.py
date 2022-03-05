@@ -1,4 +1,14 @@
 #!/usr/bin/env python3
+'''
+* Team Id : 1933
+* Author List : Kamesh,Harshavardhan,sarvesh,pranav kumar
+* Filename: SS_1933_bonuc_configuration.py
+* Theme: Strawberry Stacker -- Specific to eYRC 
+* Functions: detect_ArUco,Calculate_orientation_in_degree,setArm,setMode,autoLand,goto,position,box_grip,correction,activate_gripperdrone_1,drone_2,row_list,ret_truck_pos
+* Global Variables:previous_truck_pos,prev_box_spawn,edrone0_row_list_num,edrone1_row_list_num,drones_obj,blue_truck_pos,red_truck_pos
+'''
+
+
 from threading import Thread
 import rospy
 from sensor_msgs.msg import Image
@@ -27,7 +37,14 @@ class aruco_library():
 
         
 
+    '''
+    * Function Name:detect_ArUco
+    * Input:img
+    * Output:dictionary-which posses id's of aruco marker as keys and their respective corners as values
+    * Logic: this function detects aruco marker with the help of imported aruco libraries and returns the dictionary of aruco details
+    * Example Call: self.aruco_obj.detect_ArUco(self.img)
 
+    '''
 
     def detect_ArUco(self,img):
         ## function to detect ArUco markers in the image using ArUco library
@@ -59,6 +76,14 @@ class aruco_library():
             self.Detected_ArUco_markers={}
 
 
+    '''
+    * Function Name:Calculate_orientation_in_degree
+    * Input: image , dictionary returned from detect_ArUco function
+    * Output:dictionary-which posses id's of aruco marker as keys and their respective angles from horizontal axis as values
+    * Logic: we used opencv moments function to find centroid of aruco marker then drawn a line
+             straight to one of the border of aruco square and found the angle from the line to the horizontal axis
+    * Example Call:self.Calculate_orientation_in_degree(img,self.Detected_ArUco_markers)
+    '''
 
     def Calculate_orientation_in_degree(self,img,Detected_ArUco_markers):
         ## function to calculate orientation of ArUco with respective to the scale mentioned in problem statement
@@ -129,6 +154,7 @@ class pick_n_place():
         self.rate = rospy.Rate(20.0)
         self.in_range=False     #to check if the box in range
         self.loop_num=0
+        self.box_exist=0
 
 
 
@@ -138,7 +164,7 @@ class pick_n_place():
 
 
 
-    # arming or disarming the drone
+    # arming or disarming the drone given by eyantra
     def setArm(self,arm_bool):
         if arm_bool:
             res="ARM"
@@ -159,7 +185,7 @@ class pick_n_place():
 
 
 
-    # setting any mode to the drone
+    # setting offboard mode to the drone given by eyantra
     def setMode(self,mode_val):
         while not (self.state.mode==mode_val):    
             rospy.wait_for_service(self.drone_num+'/mavros/set_mode')
@@ -173,6 +199,7 @@ class pick_n_place():
         print(mode_val+" activated")
 
 
+    # setting autoland mode to the drone given by eyantra
 
     def autoLand(self,tol=1):
         while not (self.state.mode=='AUTO.LAND' and self.zn<tol):    
@@ -189,6 +216,14 @@ class pick_n_place():
 
 
     # navigating drone to required setpoint !!!!!!!!!!!!!
+    '''
+    * Function Name: goto
+    * Input:  setpoints where the drone should go next,x coordinate of setpoint,grip_active to say the drone whether to scan the 
+              aruco or not,xy_tol for setting the tollerance for xy axis , z_tol for setting the tollerance for z axis
+    * Output: returns nothing just to push the drone to given setpoint
+    * Logic: it just publish the given setpoint via mavros and check whether the drone reaches it
+    * Example Call: self.goto(setpoints,100,True,0.5,0.3) except setpoints others are optional
+    '''
     def goto(self,setpoints,vel,x=0,grip_activ=False,xy_tol=0.2,z_tol=0.2):
         self.setpoints=PoseStamped()
         self.vel=vel
@@ -208,104 +243,104 @@ class pick_n_place():
             self.rate.sleep()
             if len(list(self.aruco_obj.Detected_ArUco_markers.keys())) and grip_activ:   #True- when the box found in camera
                 self.box_grip()
+                if self.box_exist==200:
+                    self.box_exist=0
+                    continue
                 return
         if self.x < setpoints.pose.position.x:
-            setpoints.pose.position.z=3
             x+=4
             self.goto(setpoints,vel,x,True,xy_tol=0.4,z_tol=0.4)
         print("reached the setpoint")
 
-
-
+    '''
+    * Function Name: position
+    * Input: msg from the /mavros/local_position/pose subscriber as a call back function
+    * Output: returns nothing but set's the x,y,z current coordinates of drone
+    * Logic: just an call back function
+    * Example :self.position
+    '''
+    
     def position(self,msg):
         self.xn=msg.pose.position.x
         self.yn=msg.pose.position.y
         self.zn=msg.pose.position.z
 
 
- 
+    '''
+    * Function Name: position
+    * Input: nothing
+    * Output: returns nothing just makes the drone to grab and deliver the box
+    * Logic: after finding the aruco in the camera makes the drone to correct itself to the top of aruco box
+             and land the drone to grab it and take it to the delivery truck
+    * Example : self.box_grip()
+    '''
     def box_grip(self):
        self.correction()
        self.setpoints.pose.position.x,self.setpoints.pose.position.y=(self.xn,self.yn)
        self.activate_gripper(True)
-       time.sleep(2)
+       self.truck_pos=ret_truck_pos(self.box_id,self.drone_num)
        self.setMode('OFFBOARD')
        self.goto(self.setpoints,self.vel,self.setpoints.pose.position.x,z_tol=0.5)
        self.goto(self.truck_pos,self.vel,self.truck_pos.pose.position.x+1,z_tol=0.5)
        self.goto(self.truck_pos,self.vel,self.truck_pos.pose.position.x)
-    #    self.truck_pos.pose.position.z=5
-    #    self.goto(self.truck_pos,self.vel,self.truck_pos.pose.position.x)
-    #    self.truck_pos.pose.position.z=4
-    #    self.goto(self.truck_pos,self.vel,self.truck_pos.pose.position.x)
        self.autoLand(2)
-       time.sleep(1.5)
        self.activate_gripper(False)
        self.setMode('OFFBOARD')
-       self.goto(self.truck_pos,self.vel,self.truck_pos.pose.position.x,xy_tol=0.5,z_tol=0.5)
+       self.goto(self.truck_pos,self.vel,self.truck_pos.pose.position.x+4,xy_tol=0.5,z_tol=0.5)
        self.in_range=False
 
+    '''
+    * Function Name: correction
+    * Input: nothing
+    * Output: it will make the drone exactly to top of the box with aruco and check is that remaining in a range for 5 seconds
+    * Logic: we do have the exact diagonal length of aruco marker box(from the gazebo)
+             and by finding the diagonal length from the camera feed we will find the ratio of pixel to
+             cm and with that ratio we will find how much distance (in cm) does the aruco got deviated from the center of the camera
+             and make the drone to correct the distance and check the error to be in a range for 5 seconds 
+    * Example: self.correction() 
+    '''
 
     def correction(self):
        self.box_pos=PoseStamped()
-       print("in the loop")
        self.time_check=time.time()
+       self.box_exist=time.time()
        while True:
-           print('ratio:',self.aruco_obj.pix2cm_ratio)
            self.x_diff=(self.aruco_obj.cX-200)*self.aruco_obj.pix2cm_ratio     #g/p ratio:0.01546153846153846,0.015228426395939089
            self.y_diff=(200-self.aruco_obj.cY)*self.aruco_obj.pix2cm_ratio+0.4
            self.box_pos.pose.position.x=self.xn+self.x_diff
            self.box_pos.pose.position.y=self.yn+self.y_diff
            self.box_pos.pose.position.z=self.z
-           print(self.x_diff,self.y_diff,list(self.aruco_obj.Detected_ArUco_markers.keys()))
-        #    time.sleep(0.5)
-        #    if (self.x_diff>=-0.04 and self.x_diff<=0.03) and (self.y_diff>=-0.015 and self.y_diff<=0.03) and len(list(self.aruco_obj.Detected_ArUco_markers.keys())):
-        #        break
-        #    elif (self.y_diff>=-0.5 and self.y_diff<=0.5):
-        #     self.local_vel_pub.publish(self.vel)
-        #     self.local_pos_pub.publish(self.box_pos)
-        #     self.rate.sleep()
-        #     print(".....",end="")
+
+
+
+
            if (self.x_diff>=-0.1 and self.x_diff<=0.1) and (self.y_diff>=-0.1 and self.y_diff<=0.1):
                 if time.time() > self.time_check + 4:
-                    print('broke by time')
                     if len(list(self.aruco_obj.Detected_ArUco_markers.keys())):
-                       self.truck_pos=ret_truck_pos(list(self.aruco_obj.Detected_ArUco_markers.keys())[0],self.drone_num)
+                       self.box_id=list(self.aruco_obj.Detected_ArUco_markers.keys())[0]
                        break
                 else:
-                    print(time.time(),self.time_check)
                     self.local_vel_pub.publish(self.vel)
                     self.local_pos_pub.publish(self.box_pos)
                     self.rate.sleep()
-                    print(".....",end="")
-           elif (self.x_diff>=-0.04 and self.x_diff<=0.03) and (self.y_diff>=-0.015 and self.y_diff<=0.03) and len(list(self.aruco_obj.Detected_ArUco_markers.keys())):
-                print("broke by correction")
-                if len(list(self.aruco_obj.Detected_ArUco_markers.keys())):
-                       self.truck_pos=ret_truck_pos(list(self.aruco_obj.Detected_ArUco_markers.keys())[0],self.drone_num)
-                       break
            elif (self.y_diff>=-1 and self.y_diff<=1):
                self.time_check=time.time()
                self.local_vel_pub.publish(self.vel)
                self.local_pos_pub.publish(self.box_pos)
                self.rate.sleep()
-               print(".....",end="")
-
-
-
-
-
-
-
-
-
-
-
 
        print(self.xn,self.yn)
        self.autoLand()
        self.gripper_check=rospy.Subscriber(self.drone_num+"/gripper_check",String,self.gripper_check_cb)
        print("landed on box")
 
-
+    '''
+    * Function Name: gripper_check_cb
+    * Input: an callback function from the /gripper_check subscriber and takes the published value as input
+    * Output: checks the drone whether in the range to grab the box 
+    * Logic: an call back functiion
+    * Example : self.gripper_check_cb
+    '''
     def gripper_check_cb(self,msg_bool):
         print(msg_bool)
         if msg_bool.data == "True":
@@ -320,7 +355,15 @@ class pick_n_place():
         self.loop_num+=1
 
 
-            
+    '''
+    * Function Name: activate_gripper
+    * Input: att_bool to grab the box True-for grabbing, False- releasing the box
+    * Output: nothing
+    * Logic: just check if the box in range to grab and wait for the drone to grab after this function calls
+             when the drone in range this function sends message to drone to grab the box and for releasing 
+             it just releases without any checks
+    * Example : self.activate_gripper(True)
+    '''
 
     def activate_gripper(self,att_bool):
         while not self.in_range:
@@ -336,6 +379,14 @@ class pick_n_place():
 # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 class drones():
+    '''
+    * Function Name: drone_1
+    * Input: nothing 
+    * Output: controls every moment of edrone0
+    * Logic: an function thread which creates individual objects for above classes and access it individually for grabbing
+             sending setpoints and etc...
+    * Example : drone_1()
+    '''
     def drone_1(self):
         self.drone1_aruco_obj=aruco_library('/edrone0')
         self.drone1_image_proc_obj=image_proc(self.drone1_aruco_obj,'/edrone0')
@@ -366,20 +417,29 @@ class drones():
         self.drone1.setArm(True)
         self.drone1.setMode("OFFBOARD")
         self.drone1.goto(pos,vel,z_tol=0.5)
-        for i in row_list_num:
-            y=row_list_num.pop(0)*4-4
-            pos1.pose.position.x = 100
-            pos1.pose.position.y = y
-            pos1.pose.position.z = 4
-            self.drone1.goto(pos1,vel,xy_tol=0.1)
+        list_size=0
+        while True:
+            for i in edrone0_row_list_num:
+                if list_size<len(edrone0_row_list_num):
+                    y=i*4-4
+                    pos1.pose.position.x = 100
+                    pos1.pose.position.y = y
+                    pos1.pose.position.z = 3
+                    self.drone1.goto(pos1,vel,xy_tol=0.1)
+                    list_size+=1
 
-        self.drone1.goto(pos,vel)        
-        self.drone1.autoLand()
-        self.drone1.setArm(False)
+
         
 
-
-
+    '''
+    * Function Name: drone_2
+    * Input: nothing 
+    * Output: controls every moment of edrone1
+    * Logic: an function thread which creates individual objects for above classes and access it individually for grabbing
+             sending setpoints and etc...
+    * Example : drone_2()
+    '''
+    
     def drone_2(self):
         self.drone2_aruco_obj=aruco_library('/edrone1')
         self.drone2_image_proc_obj=image_proc(self.drone2_aruco_obj,'/edrone1')
@@ -388,7 +448,7 @@ class drones():
 
         pos.pose.position.x = 0
         pos.pose.position.y = 0
-        pos.pose.position.z = 5
+        pos.pose.position.z = 3
 
         # Set your velocity here
         vel = Twist()
@@ -408,30 +468,52 @@ class drones():
         self.drone2.setArm(True)
         self.drone2.setMode("OFFBOARD")
         self.drone2.goto(pos,vel,xy_tol=0.3,z_tol=0.5)
-        for i in row_list_num:
-            y=-((16-row_list_num.pop(0))*4)
-            pos1.pose.position.x = 100
-            pos1.pose.position.y = y
-            pos1.pose.position.z = 3
-            self.drone2.goto(pos1,vel,xy_tol=0.2,z_tol=0.5)
-        self.drone2.goto(pos,vel)        
-        self.drone2.autoLand()
-        self.drone2.setArm(False)
-
-
-    def camera_feed(self):
+        list_size=0
         while True:
-            cv2.imshow("drone 1",self.drone1_image_proc_obj.img)
-            cv2.imshow("drone 2",self.drone2_image_proc_obj.img)
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                cv2.destroyAllWindows()
-                break
+            for i in edrone1_row_list_num:
+                if list_size < len(edrone1_row_list_num):
+                    y=-((16-i)*4)
+                    pos1.pose.position.x = 100
+                    pos1.pose.position.y = y
+                    pos1.pose.position.z = 3
+                    self.drone2.goto(pos1,vel,xy_tol=0.2,z_tol=0.5)
+                    list_size+=1
 
+
+
+'''
+* Function Name: row_list
+* Input: an callback function for /spawn_info subscriber which takes the row number of boxes as input
+* Output: returns nothing just sets the row numbers individually for each drones to go next as a list
+* Logic: as we have individual list for each drones the function checks which list has more length and appends the 
+         number opposite accordingly and posses the previous msg value if previous row number and current row number
+         are same collision problem may occur to avoid those it appends to the other drones list
+* Example : row_list_num
+'''
 def row_list(msg):
-    row_list_num.append(msg.data)
-    print(row_list_num)
+    global prev_box_spawn
+    if len(edrone0_row_list_num)>len(edrone1_row_list_num):
+        if prev_box_spawn == msg.data:
+            edrone0_row_list_num.append(msg.data)
+        else:
+            edrone1_row_list_num.append(msg.data)
+    else:
+        if prev_box_spawn==msg.data:
+            edrone1_row_list_num.append(msg.data)
+        else:
+            edrone0_row_list_num.append(msg.data)
+    prev_box_spawn=msg.data
+    print(edrone0_row_list_num,edrone1_row_list_num)
 
 
+'''
+    * Function Name: ret_truck_pos
+    * Input: takes box_id of which the drone scanned before , drone_num to identify which drone called this function
+    * Output: returns the truck cell coordinate to place the box 
+    * Logic: as each drone posses different coordinate system we should send the coordinate accordingly
+             so by taking the box_id and edrone number it sends the box position accordingly
+    * Example : ret_truck_pos('1','/edrone0')
+    '''
 def ret_truck_pos(box_id,drone_num):
     global previous_truck_pos
     truck_pos=PoseStamped()
@@ -440,28 +522,33 @@ def ret_truck_pos(box_id,drone_num):
             x_cor,y_cor=red_truck_pos.pop(0)
             truck_pos.pose.position.x = 60.05-x_cor
             truck_pos.pose.position.y = 63.75+y_cor
-            truck_pos.pose.position.z = 4
+            truck_pos.pose.position.z = 6.5
         if box_id=='2':
             x_cor,y_cor=blue_truck_pos.pop(0)        
             truck_pos.pose.position.x = 17.4-x_cor
             truck_pos.pose.position.y = -8.4+y_cor
-            truck_pos.pose.position.z = 4
+            truck_pos.pose.position.z = 6.5
     if drone_num=='/edrone1':
         if box_id=='1':
             x_cor,y_cor=red_truck_pos.pop(0)
             truck_pos.pose.position.x = 60.05-x_cor
             truck_pos.pose.position.y = 3.75+y_cor
-            truck_pos.pose.position.z = 6
+            truck_pos.pose.position.z = 6.5
         if box_id=='2':
             x_cor,y_cor=blue_truck_pos.pop(0)        
             truck_pos.pose.position.x = 17.4-x_cor
             truck_pos.pose.position.y = -68.4+y_cor
-            truck_pos.pose.position.z = 6
+            truck_pos.pose.position.z = 6.5
     if previous_truck_pos[1] != drone_num:
+        print('entered loop1')
         if (previous_truck_pos[0].pose.position.x==truck_pos.pose.position.x):
-            if (previous_truck_pos[0].pose.position.y==truck_pos.pose.position.y+60 or previous_truck_pos[0].pose.position.y==truck_pos.pose.position.y-60):
+            print('entered loop2')
+            print(previous_truck_pos[0].pose.position.y,truck_pos.pose.position.y+60)
+            if (previous_truck_pos[0].pose.position.y==float("{:.2f}".format(truck_pos.pose.position.y+60))) or previous_truck_pos[0].pose.position.y==float("{:.2f}".format(truck_pos.pose.position.y-60)):
+                print('entered loop3')
                 red_truck_pos.append((x_cor,y_cor)) if box_id == '1' else blue_truck_pos.append((x_cor,y_cor))
                 for i in range(2):
+                    print('entered loop4')
                     if box_id == '1':
                         red_truck_pos.append(red_truck_pos.pop(0))
                         print(red_truck_pos)
@@ -472,17 +559,18 @@ def ret_truck_pos(box_id,drone_num):
                 print(truck_pos)
 
     previous_truck_pos=[truck_pos,drone_num,box_id]
+    print(previous_truck_pos)
 
     return truck_pos
 
 
-    
 
 
-
-print("new file")
+ # main and the place to initialize global variables
 previous_truck_pos=[PoseStamped(),'','']
-row_list_num=[]
+prev_box_spawn=0
+edrone0_row_list_num=[]
+edrone1_row_list_num=[]
 rospy.init_node('multi_box',anonymous=True)
 drones_obj=drones()
 
@@ -496,25 +584,20 @@ red_truck_pos=truck_pos.copy()
 
 
 
-# initializing the thread
-# while True:
-#     if len(row_list_num):  
+# initialinzing the threads 
 t1=Thread(target=drones_obj.drone_1)
 t2=Thread(target=drones_obj.drone_2)
-t3=Thread(target=drones_obj.camera_feed)
 
 # starting the threads
 t1.start()
 time.sleep(1)
 t2.start()
 rospy.Subscriber("/spawn_info",UInt8, row_list)
-time.sleep(10)
-t3.start()
+
 
 # waiting for the threads to complete
 t1.join()
 t2.join()
-t3.join()
 
 
 print("completed....")

@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <launch>
 	<arg name="record" default="false"/>
-    <arg name="duration" default="310"/>
+    <arg name="duration" default="315"/>
     <arg name="rec_name" default="original_config.bag"/>
 
 	<env name="PX4_HOME_LAT" value="19.134423"/>
